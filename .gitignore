@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local database (per-machine data)
+bodyfat.db
+bodyfat.db-journal
+bodyfat.db-wal
+bodyfat.db-shm
+
+# Logs & OS noise
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*.local
+
+# IDE / tooling
+.idea/
+*.swp
+*.swo
+
+# Test / coverage (if added later)
+coverage/
+
+# Python leftovers (if any)
+__pycache__/
+*.py[cod]
+
+# Local spreadsheets / data (keep repo source-only)
+*.xlsx
+*.xls
