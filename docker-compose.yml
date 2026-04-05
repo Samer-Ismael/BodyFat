@@ -1,6 +1,3 @@
-# Explicit version helps docker-compose 1.x (e.g. Ubuntu apt package).
-version: "3.8"
-
 services:
   bodyfat-tracker:
     build: .
@@ -14,18 +11,19 @@ services:
     volumes:
       - bodyfat-data:/data
     restart: unless-stopped
+    # http (not fetch): more reliable inside Docker exec on some hosts/NAS.
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:5070/api/users').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "require('http').get('http://127.0.0.1:5070/api/users',(r)=>{r.resume();r.on('end',()=>process.exit(r.statusCode===200?0:1));}).on('error',()=>process.exit(1));",
         ]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 45s
 
 volumes:
   bodyfat-data: {}
