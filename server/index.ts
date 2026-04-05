@@ -2,7 +2,6 @@ import express from "express";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
-import { createServer as createViteServer } from "vite";
 import { initDb } from "./db.js";
 import { projectRoot } from "./paths.js";
 import { apiRouter } from "./routes.js";
@@ -41,6 +40,7 @@ async function main() {
   const httpServer = http.createServer(app);
 
   if (!isProd) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       root: clientRoot,
       server: {
