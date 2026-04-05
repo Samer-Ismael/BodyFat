@@ -1,0 +1,28 @@
+services:
+  bodyfat-tracker:
+    build: .
+    image: bodyfat-tracker:local
+    ports:
+      - "${HOST_PORT:-5070}:5070"
+    environment:
+      NODE_ENV: production
+      PORT: "5070"
+      BODYFAT_DB_PATH: /data/bodyfat.db
+    volumes:
+      - bodyfat-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5070/api/users').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  bodyfat-data:

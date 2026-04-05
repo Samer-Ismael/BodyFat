@@ -1,9 +1,17 @@
+import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { parseBfMethod, parseBirthDate } from "./normalize.js";
 import { projectRoot } from "./paths.js";
 
-const dbPath = path.join(projectRoot(), "bodyfat.db");
+const dbPathRaw = process.env.BODYFAT_DB_PATH?.trim();
+const dbPath = dbPathRaw
+  ? path.resolve(dbPathRaw)
+  : path.join(projectRoot(), "bodyfat.db");
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 export const db = new DatabaseSync(dbPath);
 
 function tableExists(name: string): boolean {

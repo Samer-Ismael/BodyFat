@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+bodyfat.db
+*.log
+.DS_Store
+Thumbs.db
+docker-compose*.yml
+Dockerfile
+.dockerignore
