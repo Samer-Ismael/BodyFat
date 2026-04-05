@@ -12,6 +12,9 @@ export type Settings = {
   goal_weight_kg: number;
   bf_method: BfMethod;
   birth_date: string;
+  /** 0 = no countdown */
+  plan_total_days: number;
+  plan_start_date: string | null;
 };
 
 export type Entry = {

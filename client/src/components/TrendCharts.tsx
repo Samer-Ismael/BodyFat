@@ -98,7 +98,7 @@ export function TrendCharts({
       mRef.current?.resize();
     });
     return () => cancelAnimationFrame(id);
-  }, [chartKey, labels.length]);
+  }, [chartKey]);
 
   if (n === 0) {
     return (
@@ -219,8 +219,8 @@ export function TrendCharts({
                   callbacks: {
                     label(ctx) {
                       const v = ctx.parsed.y;
-                      if (v == null) return `${ctx.dataset.label}: —`;
-                      return `${ctx.dataset.label}: ${typeof v === "number" ? v.toFixed(2) + " %" : v}`;
+                      if (v == null || typeof v !== "number") return `${ctx.dataset.label}: —`;
+                      return `${ctx.dataset.label}: ${v.toFixed(2)} %`;
                     },
                   },
                 },

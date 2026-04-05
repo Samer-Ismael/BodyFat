@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, getApiUserId, setApiUserId } from "./api";
+import { api, setApiUserId } from "./api";
 import { TrendCharts } from "./components/TrendCharts";
 import type { BfMethod, Entry, Settings, User } from "./types";
 
@@ -40,6 +40,8 @@ function toCsv(rows: Entry[], s: Settings) {
       "goal_body_fat_pct",
       "goal_waist_cm",
       "goal_weight_kg",
+      "plan_total_days",
+      "plan_start_date",
     ].join(","),
     ...sortAsc(rows).map((e) =>
       [
@@ -52,10 +54,26 @@ function toCsv(rows: Entry[], s: Settings) {
         s.goal_body_fat,
         s.goal_waist_cm,
         s.goal_weight_kg,
+        s.plan_total_days,
+        s.plan_start_date ?? "",
       ].join(",")
     ),
   ];
   return lines.join("\r\n");
+}
+
+/** Calendar days remaining in a fixed-length plan (day 1 = start date). */
+function planDaysRemaining(totalDays: number, startISO: string | null, todayISO: string): number | null {
+  if (totalDays < 1 || !startISO || !/^\d{4}-\d{2}-\d{2}$/.test(startISO)) return null;
+  const utc = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const st = utc(startISO);
+  const t = utc(todayISO);
+  if (t < st) return totalDays;
+  const elapsedDays = Math.floor((t - st) / 86400000) + 1;
+  return Math.max(0, totalDays - elapsedDays);
 }
 
 export function App() {
@@ -81,6 +99,8 @@ export function App() {
   const [goalWeight, setGoalWeight] = useState("");
   const [bfMethod, setBfMethod] = useState<BfMethod>("navy");
   const [birthDate, setBirthDate] = useState("");
+  const [planTotalDays, setPlanTotalDays] = useState("0");
+  const [planStartDate, setPlanStartDate] = useState("");
 
   const applySettings = useCallback((s: Settings) => {
     setHCm(String(s.height_cm));
@@ -89,6 +109,8 @@ export function App() {
     setGoalWeight(String(s.goal_weight_kg));
     setBfMethod(s.bf_method);
     setBirthDate(s.birth_date);
+    setPlanTotalDays(String(s.plan_total_days));
+    setPlanStartDate(s.plan_start_date ?? "");
   }, []);
 
   const refreshData = useCallback(async () => {
@@ -116,11 +138,8 @@ export function App() {
         setApiUserId(pick);
         setCurrentUserId(pick);
         localStorage.setItem(LS_USER, String(pick));
-        const [s, elist] = await Promise.all([api<Settings>("/settings"), api<Entry[]>("/entries")]);
+        await refreshData();
         if (cancelled) return;
-        setSettings(s);
-        setEntries(elist);
-        applySettings(s);
       } catch (e) {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : "Failed to load");
       }
@@ -128,7 +147,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [applySettings]);
+  }, [refreshData]);
 
   const rowsAsc = useMemo(() => sortAsc(entries), [entries]);
 
@@ -140,11 +159,15 @@ export function App() {
   const stats = useMemo(() => {
     if (!settings || entries.length === 0) return null;
     const latest = entries[0];
-    const bf = latest.body_fat_pct;
-    const bfN = bf != null && Number.isFinite(bf) ? bf : null;
+    const bfN = latest.body_fat_pct != null && Number.isFinite(latest.body_fat_pct) ? latest.body_fat_pct : null;
     const toGoal = bfN != null ? bfN - settings.goal_body_fat : null;
-    return { latest, bf: bfN, toGoal: Number.isFinite(toGoal as number) ? toGoal : null };
+    return { latest, bf: bfN, toGoal: toGoal != null && Number.isFinite(toGoal) ? toGoal : null };
   }, [entries, settings]);
+
+  const planDaysLeft = useMemo(() => {
+    if (!settings) return null;
+    return planDaysRemaining(settings.plan_total_days, settings.plan_start_date, todayISO());
+  }, [settings]);
 
   async function onSelectUser(id: number) {
     setDemoMsg(null);
@@ -178,14 +201,27 @@ export function App() {
   async function onRemoveUser() {
     const id = Number(removeUserId);
     if (!Number.isFinite(id) || id < 1) return;
-    if (!confirm("Remove this user and all their entries?")) return;
+    const victim = users.find((u) => u.id === id);
+    if (!victim) return;
+    const warn =
+      `You are about to PERMANENTLY delete user "${victim.name}" and ALL their measurements.\n\nThis cannot be undone. Continue?`;
+    if (!window.confirm(warn)) return;
+    const typed = window.prompt(`Type this user's name exactly to confirm deletion:\n\n${victim.name}`);
+    if (typed == null) {
+      setSettingsErr("Cancelled.");
+      return;
+    }
+    if (typed.trim() !== victim.name) {
+      setSettingsErr("Name did not match. Nothing was deleted.");
+      return;
+    }
+    setSettingsErr(null);
     try {
       await api(`/users/${id}`, { method: "DELETE" });
       const list = await api<User[]>("/users");
       setUsers(list);
       setRemoveUserId("");
-      const uid = getApiUserId();
-      if (uid === id) {
+      if (currentUserId === id) {
         const next = list[0]?.id;
         if (next) {
           setApiUserId(next);
@@ -196,6 +232,28 @@ export function App() {
       } else {
         await refreshData();
       }
+    } catch (err) {
+      setSettingsErr(err instanceof Error ? err.message : "Error");
+    }
+  }
+
+  async function onResetProfile() {
+    const warn =
+      `This will DELETE every measurement for "${currentUserName}" and reset ALL settings (goals, height, formula, birth date, plan) to defaults.\n\nYour user name will stay. This cannot be undone. Continue?`;
+    if (!window.confirm(warn)) return;
+    const typed = window.prompt("Type RESET in capitals to confirm:");
+    if (typed == null) {
+      setSettingsErr("Cancelled.");
+      return;
+    }
+    if (typed !== "RESET") {
+      setSettingsErr('You must type exactly: RESET');
+      return;
+    }
+    setSettingsErr(null);
+    try {
+      await api<Settings>("/profile/reset", { method: "POST" });
+      await refreshData();
     } catch (err) {
       setSettingsErr(err instanceof Error ? err.message : "Error");
     }
@@ -228,6 +286,11 @@ export function App() {
     e.preventDefault();
     setSettingsErr(null);
     try {
+      const pDays = Math.max(0, Math.min(3650, Math.floor(parseFloat(planTotalDays) || 0)));
+      if (pDays > 0 && !planStartDate.trim()) {
+        setSettingsErr("Set plan start date when plan length is greater than 0.");
+        return;
+      }
       await api("/settings", {
         method: "PUT",
         body: JSON.stringify({
@@ -237,6 +300,8 @@ export function App() {
           goal_weight_kg: parseFloat(goalWeight),
           bf_method: bfMethod,
           birth_date: birthDate,
+          plan_total_days: pDays,
+          plan_start_date: pDays > 0 ? planStartDate : "",
         }),
       });
       await refreshData();
@@ -345,47 +410,60 @@ export function App() {
         </div>
       </header>
 
-      <div className={`stats${!stats ? " stats--empty" : ""}`} aria-live="polite">
-        {!stats ? (
-          <div className="stat">
-            <div className="stat-label">Status</div>
-            <div className="stat-value stat-value--muted">No entries</div>
-          </div>
-        ) : (
-          <>
-            <div className="stat">
-              <div className="stat-label">Body fat</div>
-              <div className="stat-value">{stats.bf == null ? "—" : `${stats.bf.toFixed(2)} %`}</div>
+      <div className="stats" aria-live="polite">
+        <div className={`stat${!stats ? " stat--muted" : ""}`}>
+          <div className="stat-label">Body fat</div>
+          <div className="stat-value">{stats?.bf == null ? "—" : `${stats.bf.toFixed(2)} %`}</div>
+          {stats && (
+            <>
               <div className="stat-hint">{bfMethodShort(settings.bf_method)}</div>
               {stats.toGoal != null && Number.isFinite(stats.toGoal) && (
                 <div className={`stat-hint ${stats.toGoal <= 0 ? "pos" : "neg"}`}>
                   {stats.toGoal <= 0 ? `${Math.abs(stats.toGoal).toFixed(1)} % vs goal` : `+${stats.toGoal.toFixed(1)} % vs goal`}
                 </div>
               )}
-            </div>
-            <div className="stat">
-              <div className="stat-label">Weight</div>
-              <div className="stat-value">
+            </>
+          )}
+          {!stats && <div className="stat-hint">Add an entry</div>}
+        </div>
+        <div className={`stat${!stats ? " stat--muted" : ""}`}>
+          <div className="stat-label">Weight</div>
+          <div className="stat-value">
+            {stats ? (
+              <>
                 {fmt1(stats.latest.weight_kg)}
                 <span className="stat-unit">kg</span>
-              </div>
-              <div className="stat-hint">Goal {settings.goal_weight_kg} kg</div>
-            </div>
-            <div className="stat">
-              <div className="stat-label">Waist</div>
-              <div className="stat-value">
+              </>
+            ) : (
+              "—"
+            )}
+          </div>
+          {stats && <div className="stat-hint">Goal {settings.goal_weight_kg} kg</div>}
+        </div>
+        <div className={`stat${!stats ? " stat--muted" : ""}`}>
+          <div className="stat-label">Waist</div>
+          <div className="stat-value">
+            {stats ? (
+              <>
                 {fmt1(stats.latest.waist_cm)}
                 <span className="stat-unit">cm</span>
-              </div>
-              <div className="stat-hint">Goal {settings.goal_waist_cm} cm</div>
+              </>
+            ) : (
+              "—"
+            )}
+          </div>
+          {stats && <div className="stat-hint">Goal {settings.goal_waist_cm} cm</div>}
+        </div>
+        <div className="stat">
+          <div className="stat-label">Log</div>
+          <div className="stat-value">{entries.length}</div>
+          <div className="stat-hint">{stats ? stats.latest.entry_date : "No entries yet"}</div>
+          {planDaysLeft != null && (
+            <div className={`stat-hint ${planDaysLeft === 0 ? "neg" : ""}`}>
+              {planDaysLeft} day{planDaysLeft === 1 ? "" : "s"} left in plan
             </div>
-            <div className="stat">
-              <div className="stat-label">Log</div>
-              <div className="stat-value">{entries.length}</div>
-              <div className="stat-hint">{stats.latest.entry_date}</div>
-            </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="goals-bar">
@@ -484,35 +562,68 @@ export function App() {
                 <label htmlFor="gwt">Weight goal (kg)</label>
                 <input id="gwt" type="number" step="0.1" value={goalWeight} onChange={(e) => setGoalWeight(e.target.value)} required />
               </div>
+              <div>
+                <label htmlFor="pl">Plan length (days)</label>
+                <input
+                  id="pl"
+                  type="number"
+                  step="1"
+                  min={0}
+                  max={3650}
+                  value={planTotalDays}
+                  onChange={(e) => setPlanTotalDays(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="psd">Plan start date</label>
+                <input
+                  id="psd"
+                  type="date"
+                  value={planStartDate}
+                  onChange={(e) => setPlanStartDate(e.target.value)}
+                  disabled={Math.max(0, parseInt(planTotalDays, 10) || 0) < 1}
+                />
+              </div>
             </div>
+            <p className="settings-hint">Set plan length to 0 to hide the countdown. If length &gt; 0, pick the first day of the plan.</p>
             <button type="submit" className="ghost">
               Save settings
             </button>
             {settingsErr && <div className="err">{settingsErr}</div>}
           </form>
 
-          {users.length > 1 && (
-            <div className="user-remove-block">
-              <div className="row user-remove-row">
-                <div>
-                  <label htmlFor="rmu">Remove user</label>
-                  <select id="rmu" value={removeUserId} onChange={(e) => setRemoveUserId(e.target.value)}>
-                    <option value="">—</option>
+          <div className="danger-zone">
+            <h3 className="danger-zone-title">Danger zone</h3>
+            <p className="danger-zone-text">
+              Reset removes all measurements and default-settings this profile (name unchanged). Delete user removes that person entirely (not allowed for the last user).
+            </p>
+            <div className="danger-zone-actions">
+              <button type="button" className="danger" onClick={onResetProfile}>
+                Reset this profile
+              </button>
+              {users.length > 1 && (
+                <div className="danger-delete-row">
+                  <select
+                    className="danger-select"
+                    value={removeUserId}
+                    onChange={(e) => setRemoveUserId(e.target.value)}
+                    aria-label="User to delete"
+                  >
+                    <option value="">Delete user…</option>
                     {users.map((u) => (
                       <option key={u.id} value={String(u.id)}>
                         {u.name}
                       </option>
                     ))}
                   </select>
-                </div>
-                <div>
                   <button type="button" className="danger" disabled={!removeUserId} onClick={onRemoveUser}>
-                    Remove
+                    Delete user
                   </button>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+          </div>
         </section>
       </details>
 

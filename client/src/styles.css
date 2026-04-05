@@ -92,18 +92,59 @@ main {
   flex-shrink: 0;
 }
 
-.user-remove-block {
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
-  margin-top: 0.75rem;
+.settings-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: -0.25rem 0 0.75rem;
+  line-height: 1.35;
 }
 
-.user-remove-row {
-  align-items: flex-end;
+.danger-zone {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 69, 58, 0.25);
 }
 
-.user-remove-row button {
-  margin-bottom: 0.65rem;
+.danger-zone-title {
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--danger);
+  margin: 0 0 0.35rem;
+}
+
+.danger-zone-text {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+  max-width: 40rem;
+}
+
+.danger-zone-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.danger-delete-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.danger-select {
+  min-width: 160px;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-family: inherit;
 }
 
 h1 {
@@ -156,15 +197,8 @@ h1 {
   }
 }
 
-.stats.stats--empty {
-  grid-template-columns: 1fr;
-}
-
-.stats.stats--empty .stat {
-  min-height: 4.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.stat.stat--muted {
+  opacity: 0.55;
 }
 
 .stat {

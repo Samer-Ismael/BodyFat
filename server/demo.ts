@@ -14,5 +14,3 @@ export const DEMO_ROWS: ReadonlyArray<readonly [string, number, number, number]>
   ["2025-11-25", 87.8, 97.0, 40.4],
   ["2025-12-02", 87.4, 96.5, 40.5],
 ];
-
-export const DEMO_DATES = DEMO_ROWS.map((r) => r[0]);

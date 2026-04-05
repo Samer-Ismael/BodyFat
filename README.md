@@ -39,7 +39,7 @@ The database file **`bodyfat.db`** is created next to the project on first run.
 | -------------- | ------------------------------------------------ |
 | `npm run dev`  | Dev server + Vite (watch with `tsx`).            |
 | `npm run build`| Production client bundle + compile server TS.    |
-| `npm start`    | Run compiled server (`NODE_ENV=production`).     |
+| `npm start`    | Run compiled server from `dist/` (set `NODE_ENV=production` for static assets). |
 
 After `npm run build`:
 

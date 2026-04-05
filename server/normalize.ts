@@ -12,9 +12,9 @@ export function num(v: unknown, fallback = NaN): number {
 }
 
 export function entryRow(r: Record<string, unknown>) {
-  const idRaw = typeof r.id === "bigint" ? Number(r.id) : num(r.id, NaN);
+  const id = num(r.id, NaN);
   return {
-    id: Number.isFinite(idRaw) ? idRaw : 0,
+    id: Number.isFinite(id) ? id : 0,
     entry_date: String(r.entry_date ?? ""),
     weight_kg: num(r.weight_kg, NaN),
     waist_cm: num(r.waist_cm, NaN),
@@ -23,9 +23,9 @@ export function entryRow(r: Record<string, unknown>) {
 }
 
 export function userRow(r: Record<string, unknown>) {
-  const idRaw = typeof r.id === "bigint" ? Number(r.id) : num(r.id, NaN);
+  const id = num(r.id, NaN);
   return {
-    id: Number.isFinite(idRaw) && idRaw > 0 ? idRaw : 0,
+    id: Number.isFinite(id) && id > 0 ? id : 0,
     name: String(r.name ?? "").trim(),
   };
 }
@@ -55,8 +55,12 @@ export function settingsRow(r: Record<string, unknown> | undefined) {
       goal_weight_kg: 82,
       bf_method: "navy" as BfMethod,
       birth_date: defaultBirth,
+      plan_total_days: 0,
+      plan_start_date: null as string | null,
     };
   }
+  const planDays = Math.max(0, Math.min(3650, Math.floor(num(r.plan_total_days, 0))));
+  const planStart = parseBirthDate(r.plan_start_date);
   return {
     height_cm: num(r.height_cm, 178),
     goal_body_fat: num(r.goal_body_fat, 12),
@@ -64,5 +68,7 @@ export function settingsRow(r: Record<string, unknown> | undefined) {
     goal_weight_kg: num(r.goal_weight_kg, 82),
     bf_method: parseBfMethod(r.bf_method),
     birth_date: parseBirthDate(r.birth_date) ?? defaultBirth,
+    plan_total_days: planDays,
+    plan_start_date: planStart,
   };
 }

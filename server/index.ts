@@ -64,10 +64,7 @@ async function main() {
   }
 
   httpServer.listen(port, "0.0.0.0", () => {
-    console.log(`\n  → Open ONLY:  http://127.0.0.1:${port}`);
-    console.log(`     (localhost redirects here so you always use one URL)\n`);
-    console.log(`Project root: ${root}`);
-    if (!isProd) console.log("Dev: Express + Vite (HMR attached to HTTP server).");
+    console.log(`Body fat tracker → http://127.0.0.1:${port}${isProd ? "" : " (dev + Vite)"}`);
   });
 }
 

@@ -4,10 +4,6 @@ export function setApiUserId(id: number): void {
   currentUserId = id;
 }
 
-export function getApiUserId(): number | null {
-  return currentUserId;
-}
-
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body != null && !headers.has("Content-Type")) {

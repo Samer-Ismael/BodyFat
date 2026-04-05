@@ -63,12 +63,14 @@ function migrateLegacyToMultiUser(): void {
         goal_waist_cm REAL NOT NULL DEFAULT 83,
         goal_weight_kg REAL NOT NULL DEFAULT 82,
         bf_method TEXT NOT NULL DEFAULT 'navy',
-        birth_date TEXT NOT NULL DEFAULT '1990-01-01'
+        birth_date TEXT NOT NULL DEFAULT '1990-01-01',
+        plan_total_days INTEGER NOT NULL DEFAULT 0,
+        plan_start_date TEXT
       );
     `);
     db.prepare(
-      `INSERT INTO user_settings (user_id, height_cm, goal_body_fat, goal_waist_cm, goal_weight_kg, bf_method, birth_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO user_settings (user_id, height_cm, goal_body_fat, goal_waist_cm, goal_weight_kg, bf_method, birth_date, plan_total_days, plan_start_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL)`
     ).run(userId, height_cm, goal_body_fat, goal_waist_cm, goal_weight_kg, bf_method, birth_date);
 
     db.exec("DROP TABLE settings");
@@ -96,7 +98,9 @@ function createFreshMultiUserSchema(): void {
       goal_waist_cm REAL NOT NULL DEFAULT 83,
       goal_weight_kg REAL NOT NULL DEFAULT 82,
       bf_method TEXT NOT NULL DEFAULT 'navy',
-      birth_date TEXT NOT NULL DEFAULT '1990-01-01'
+      birth_date TEXT NOT NULL DEFAULT '1990-01-01',
+      plan_total_days INTEGER NOT NULL DEFAULT 0,
+      plan_start_date TEXT
     );
     CREATE TABLE entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,15 +115,29 @@ function createFreshMultiUserSchema(): void {
   db.prepare("INSERT INTO users (name) VALUES ('Me')").run();
   const uid = (db.prepare("SELECT id FROM users LIMIT 1").get() as { id: number }).id;
   db.prepare(
-    `INSERT INTO user_settings (user_id, height_cm, goal_body_fat, goal_waist_cm, goal_weight_kg, bf_method, birth_date)
-     VALUES (?, 178, 12, 83, 82, 'navy', '1990-01-01')`
+    `INSERT INTO user_settings (user_id, height_cm, goal_body_fat, goal_waist_cm, goal_weight_kg, bf_method, birth_date, plan_total_days, plan_start_date)
+     VALUES (?, 178, 12, 83, 82, 'navy', '1990-01-01', 0, NULL)`
   ).run(uid);
+}
+
+function migrateUserSettingsPlanColumns(): void {
+  try {
+    db.exec("ALTER TABLE user_settings ADD COLUMN plan_total_days INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    /* exists */
+  }
+  try {
+    db.exec("ALTER TABLE user_settings ADD COLUMN plan_start_date TEXT");
+  } catch {
+    /* exists */
+  }
 }
 
 export function initDb(): void {
   db.exec("PRAGMA foreign_keys = ON");
 
   if (tableExists("users")) {
+    migrateUserSettingsPlanColumns();
     return;
   }
 
