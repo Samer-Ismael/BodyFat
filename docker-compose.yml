@@ -1,3 +1,6 @@
+# Explicit version helps docker-compose 1.x (e.g. Ubuntu apt package).
+version: "3.8"
+
 services:
   bodyfat-tracker:
     build: .
@@ -25,4 +28,4 @@ services:
       start_period: 15s
 
 volumes:
-  bodyfat-data:
+  bodyfat-data: {}
